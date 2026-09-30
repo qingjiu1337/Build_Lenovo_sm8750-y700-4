@@ -60,8 +60,8 @@
 
 - **kernel_version**: 选择要编译的内核版本
 - **KSU Type**: 选择 KernelSU 类型 (ReSukiSU / SukiSU-Ultra)
-- **ksu_version**: ReSukiSU 版本 — 默认固定 `v4.1.0`（对应 Manager APK v4.1.0_34965，不再跟随上游更新），可选 `latest` 跟随上游 main 分支
 - **Enable KPM**: 是否启用 KPM（patch 工具固定为 0.13.0）
+- **enable_ksu_apk**: 是否在构建产物中附带固定版 ReSukiSU Manager APK（v4.1.0_34965，随仓库 `apk/` 目录分发）
 - **Custom Flags**: 添加额外的编译标志
 
 #### 使用公共缓存

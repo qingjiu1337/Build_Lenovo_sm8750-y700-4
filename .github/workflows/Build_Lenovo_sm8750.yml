@@ -56,14 +56,11 @@ on:
         default: true
         type: boolean
 
-      ksu_version:
-        description: "📌 ReSukiSU 版本（v4.1.0=固定对应Manager v4.1.0_34965，latest=跟随上游）"
+      enable_ksu_apk:
+        description: "📦 构建附带固定版ReSukiSU Manager APK (v4.1.0_34965)"
         required: true
-        type: choice
-        options:
-          - 'v4.1.0'
-          - 'latest'
-        default: 'v4.1.0'
+        default: true
+        type: boolean
 
       enable_signed:
         description: "使用AOSP密钥签名boot"
@@ -87,7 +84,7 @@ jobs:
       ENABLE_DROIDSPACES: ${{ github.event.inputs.enable_droidspaces }}
       ENABLE_BBG: ${{ github.event.inputs.enable_bbg }}
       ENABLE_KPM: ${{ github.event.inputs.enable_kpm }}
-      KSU_REF: ${{ github.event.inputs.ksu_version }}
+      ENABLE_KSU_APK: ${{ github.event.inputs.enable_ksu_apk }}
       ENABLE_SIGNED: ${{ github.event.inputs.enable_signed }}
     steps:
       - uses: actions/checkout@v5
@@ -452,24 +449,19 @@ jobs:
         run: |
           cd kernel_workspace
           echo "正在配置ReSukiSU..."
-          # 固定版本：ReSukiSU main@bc8846b7 (rev-count 4265)，对应 Manager APK v4.1.0_34965
-          # latest：跟随上游 main 分支
-          case "${{ env.KSU_REF }}" in
-            "v4.1.0")
-              KSU_COMMIT="bc8846b7d4105c10a4a38bb9874fa5528129a35e"
-              echo "使用固定版本 ReSukiSU v4.1.0 (commit $KSU_COMMIT)"
-              ;;
-            *)
-              KSU_COMMIT="main"
-              echo "跟随上游 ReSukiSU main 分支"
-              ;;
-          esac
-          curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/refs/heads/main/kernel/setup.sh" | bash -s $KSU_COMMIT
+          curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/refs/heads/main/kernel/setup.sh" | bash -s main
           cd ./KernelSU
-          # 版本号按官方公式由本地检出的源码树计算：固定 commit 时结果恒为 34965
+          # 版本号按官方公式由本地检出的源码树计算（跟随上游 main 分支）
           KSU_VERSION=$(expr $(git rev-list --count HEAD) + 30700 2>/dev/null || echo 114514)
           echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
           echo "ksuver=$KSU_VERSION" >> $GITHUB_OUTPUT
+
+      - name: 📦 Upload fixed ReSukiSU Manager APK (上传固定版Manager APK)
+        if: ${{ env.ENABLE_KSU_APK == 'true' }}
+        uses: actions/upload-artifact@v5
+        with:
+          name: ReSukiSU_Manager_v4.1.0_34965
+          path: apk/ReSukiSU_v4.1.0_34965-arm64-v8a-release.apk
 
       - name: 🔧 Apply Droidspaces SYSVIPC kABI fix (应用 Droidspaces SYSVIPC kABI 修复)
         if: ${{ env.ENABLE_DROIDSPACES == 'true' }}
