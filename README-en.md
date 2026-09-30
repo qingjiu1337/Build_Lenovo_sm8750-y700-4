@@ -62,6 +62,7 @@ During workflow execution, you can configure the following parameters:
 - **KSU Type**: Choose KernelSU type (ReSukiSU / SukiSU-Ultra)
 - **Enable KPM**: Whether to enable KPM (patch tool pinned to 0.13.0)
 - **enable_ksu_apk**: Whether to include the fixed ReSukiSU Manager APK (v4.1.0_34965, shipped in the repo `apk/` directory) in build artifacts
+- **enable_zw_fix**: Whether to apply the Unicode zero-width bypass fix patch (CVE-2024-43093/CVE-2024-50089, enabled by default; patches auto-fetched from upstream ITxiao6666/Unicode_bypass_Fix)
 - **Custom Flags**: Add additional compilation flags
 
 #### Using Public Cache
