@@ -60,6 +60,7 @@ During workflow execution, you can configure the following parameters:
 
 - **kernel_version**: Select the kernel version to compile
 - **KSU Type**: Choose KernelSU type (ReSukiSU / SukiSU-Ultra)
+- **ksu_version**: ReSukiSU version — defaults to pinned `v4.1.0` (matches Manager APK v4.1.0_34965, no longer follows upstream), or choose `latest` to track upstream main
 - **Enable KPM**: Whether to enable KPM (patch tool pinned to 0.13.0)
 - **Custom Flags**: Add additional compilation flags
 
