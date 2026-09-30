@@ -60,7 +60,8 @@
 
 - **kernel_version**: 选择要编译的内核版本
 - **KSU Type**: 选择 KernelSU 类型 (ReSukiSU / SukiSU-Ultra)
-- **Enable KPM**: 是否启用 KPM（patch 工具固定为 0.13.0）
+- **Enable KPM**: 是否启用 KPM（patch 工具固定为 0.12.2，与固定内核源配对）
+- **ksu_version**: ReSukiSU 内核源 — 默认 `kpm` 固定到最后支持 KPM 的版本（main@a13d71f6，内核版本号 34943）；`latest` 跟随上游（上游已于 2026-06-06 移除 KPM，不再支持）
 - **enable_ksu_apk**: 是否在构建产物中附带固定版 ReSukiSU Manager APK（v4.1.0_34965，随仓库 `apk/` 目录分发）
 - **enable_zw_fix**: 是否应用 Unicode 零宽绕过修复补丁（CVE-2024-43093/CVE-2024-50089，默认开启，补丁自动从上游 ITxiao6666/Unicode_bypass_Fix 获取）
 - **Custom Flags**: 添加额外的编译标志
