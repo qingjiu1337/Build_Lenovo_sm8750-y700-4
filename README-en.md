@@ -12,7 +12,7 @@
 
 ## 📖 Introduction
 
-This project provides an automated kernel compilation workflow based on **GitHub Actions**, supporting **Lenovo** devices equipped with the **SM8750** platform. Through highly integrated scripts, it enables one-click compilation of GKI kernels featuring **(Re)SukiSU**, **SUSFS**, **ADIOS IOScheduler**, and other functionalities.
+This project provides an automated kernel compilation workflow based on **GitHub Actions**, supporting **Lenovo** devices equipped with the **SM8750** platform. Through highly integrated scripts, it enables one-click compilation of GKI kernels featuring **(Re)SukiSU**, **KPM**, **ADIOS IOScheduler**, and other functionalities. (SUSFS support has been removed; the KPM patch tool is pinned to 0.13.0 and no longer updated.)
 
 ### ✨ Key Features
 
@@ -46,7 +46,7 @@ Click the **Fork** button in the upper right corner of the repository to copy th
 
 | Workflow | Description | Use Case |
 |----------|-------------|----------|
-| [build.yml](.github/workflows/build.yml) | Full kernel compilation (including KSU/SUSFS, etc.) | Integrate KSU to obtain ROOT |
+| [build.yml](.github/workflows/build.yml) | Full kernel compilation (including KSU/KPM, etc.) | Integrate KSU to obtain ROOT |
 | [clean-caches.yml](.github/workflows/clean-caches.yml) | Clean ccache cache | When cache is abnormal or recompilation is needed |
 | [clear_workflows.yml](.github/workflows/clear_workflows.yml) | Clear workflow run records | Keep Action interface clean |
 
@@ -60,7 +60,7 @@ During workflow execution, you can configure the following parameters:
 
 - **kernel_version**: Select the kernel version to compile
 - **KSU Type**: Choose KernelSU type (ReSukiSU / SukiSU-Ultra)
-- **Enable SUSFS**: Whether to enable SUSFS support
+- **Enable KPM**: Whether to enable KPM (patch tool pinned to 0.13.0)
 - **Custom Flags**: Add additional compilation flags
 
 #### Using Public Cache
