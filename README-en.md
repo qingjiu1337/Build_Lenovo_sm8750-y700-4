@@ -1,136 +1,134 @@
-# Lenovo SM8750 Kernel Build Project
+# Lenovo SM8750 内核构建项目
 
-[简体中文](README.md) | **`English`**<br>
+**`简体中文`** | [English](README-en.md)<br>
 
 [![GitHub](https://img.shields.io/badge/-GitHub|@qdykernel-181717?logo=github&logoColor=white&style=flat-square)](https://github.com/qdykernel/Build_Lenovo_sm8750)
-[![Telegram](https://img.shields.io/badge/Telegram-Channel-blue.svg?logo=telegram)](https://t.me/qdykernel)
-[![CoolApk|Profile](https://img.shields.io/badge/CoolApk%7CProfile-3DDC84?style=flat-square&logo=android&logoColor=white)](http://www.coolapk.com/u/1624571)
+[![Telegram](https://img.shields.io/badge/Telegram-频道-blue.svg?logo=telegram)](https://t.me/qdykernel)
+[![酷安|主页](https://img.shields.io/badge/酷安|主页-3DDC84?style=flat-square&logo=android&logoColor=white)](http://www.coolapk.com/u/1624571)
 [![Workflow Status](https://img.shields.io/github/actions/workflow/status/qdykernel/Build_Lenovo_sm8750/build.yml?label=Build&logo=github-actions&style=flat-square)](https://github.com/qdykernel/Build_Lenovo_sm8750/actions)
 <br>
 
 ---
 
-## 📖 Introduction
+## 📖 项目简介
 
-This project provides an automated kernel compilation workflow based on **GitHub Actions**, supporting **Lenovo** devices equipped with the **SM8750** platform. Through highly integrated scripts, it enables one-click compilation of GKI kernels featuring **(Re)SukiSU**, **KPM**, **ADIOS IOScheduler**, and other functionalities. (SUSFS support has been removed; the KPM patch tool is pinned to 0.13.0 and no longer updated.)
+本项目提供基于 **GitHub Actions** 的自动化内核编译工作流，支持 **Lenovo** 搭载 **SM8750** 平台的设备。通过高度集成的脚本，实现一键编译包含 **BakaSU（原 ReSukiSU）**、**SUSFS**、**ADIOS调度** 等功能的 GKI 内核（已移除 KPM 支持，KSU 内核源始终跟随上游最新 main）。
 
-### ✨ Key Features
+### ✨ 主要特性
 
-- 🚀 **Fully Automated Compilation** - Based on GitHub Actions, no local environment required
-- 🔧 **Multiple KSU Support** - ReSukiSU / SukiSU-Ultra options available
-- ⚡ **Performance Optimization** - Integrated ADIOS I/Oscheduler patch
-- 💾 **ccache Caching** - Intelligent cache management, 50% speed boost for first compilation with public cache, 80% for subsequent compilations
-- 📦 **Ready to Use** - Automatically generates AnyKernel3 flashable packages
-
----
-
-## 🎯 Quick Start
-
-### Method 1: GitHub Actions Cloud Compilation (Recommended)
-
-#### Step 1. Fork This Repository
-
-Click the **Fork** button in the upper right corner of the repository to copy this repository to your own GitHub account.
-
-#### Step 2. Run Workflow
-
-1. Enter your forked repository
-2. Click the **Actions** tab
-3. Select the corresponding workflow (see instructions below)
-4. Click the **Run workflow** button
-5. Fill in the compilation parameters
-6. Wait for compilation to complete (first build takes approximately 12 minutes)
-7. Download the compiled artifacts from **Artifacts**
-
-### 📋 Available Workflows
-
-| Workflow | Description | Use Case |
-|----------|-------------|----------|
-| [build.yml](.github/workflows/build.yml) | Full kernel compilation (including KSU/KPM, etc.) | Integrate KSU to obtain ROOT |
-| [clean-caches.yml](.github/workflows/clean-caches.yml) | Clean ccache cache | When cache is abnormal or recompilation is needed |
-| [clear_workflows.yml](.github/workflows/clear_workflows.yml) | Clear workflow run records | Keep Action interface clean |
+- 🚀 **全自动化编译** - 基于 GitHub Actions，无需本地环境
+- 🔧 **多种 KSU 支持** - ReSukiSU / SukiSU-Ultra 可选
+- ⚡ **性能优化** - 集成ADIOS I/O调度补丁
+- 💾 **ccache 缓存** - 智能缓存管理，首次编译使用公共缓存提速 50%，二次编译提速 80%
+- 📦 **开箱即用** - 自动生成 AnyKernel3 刷入包
 
 ---
 
-## 🔧 Advanced Features
+## 🎯 快速开始
 
-### Custom Compilation Options
+### 方式一：GitHub Actions 云编译（推荐）
 
-During workflow execution, you can configure the following parameters:
+#### 步骤 1. Fork 本仓库
 
-- **kernel_version**: Select the kernel version to compile
-- **KSU Type**: Choose KernelSU type (ReSukiSU / SukiSU-Ultra)
-- **Enable KPM**: Whether to enable KPM (patch tool pinned to 0.12.2, paired with the pinned kernel source)
-- **ksu_version**: ReSukiSU kernel source — defaults to `kpm`, pinned to the last KPM-supporting version (main@a13d71f6, kernel version 34943); `latest` tracks upstream (KPM support was removed upstream on 2026-06-06)
-- **enable_ksu_apk**: Whether to include the fixed ReSukiSU Manager APK (v4.1.0_34965, shipped in the repo `apk/` directory) in build artifacts
-- **enable_zw_fix**: Whether to apply the Unicode zero-width bypass fix patch (CVE-2024-43093/CVE-2024-50089, enabled by default; patches auto-fetched from upstream ITxiao6666/Unicode_bypass_Fix)
-- **Custom Flags**: Add additional compilation flags
+点击仓库右上角的 **Fork** 按钮，将本仓库复制到你自己的 GitHub 账户。
 
-#### Using Public Cache
+#### 步骤 2. 运行工作流
 
-The project will automatically download pre-compiled cache from the public cache repository, allowing acceleration even for the first compilation.
+1. 进入你 Fork 的仓库
+2. 点击 **Actions** 标签页
+3. 选择对应的工作流（见下方说明）
+4. 点击 **Run workflow** 按钮
+5. 填写编译参数
+6. 等待编译完成（首次构建约12分钟）
+7. 在 **Artifacts** 中下载编译产物
 
-#### Cleaning Old Cache
+### 📋 可用工作流
 
-When build time exceeds 8 minutes, old ccache cache will be automatically cleaned to avoid occupying too much GitHub storage space. You can also manually run the [clean-caches](.github/workflows/clean-caches.yml) workflow to clean all caches.
+| 工作流 | 说明 | 适用场景 |
+|--------|------|----------|
+| [build.yml](.github/workflows/build.yml) | 完整内核编译（含 KSU 等） | 集成KSU获取ROOT |
+| [clean-caches.yml](.github/workflows/clean-caches.yml) | 清理 ccache 缓存 | 缓存异常或需要重新编译时 |
+| [clear_workflows.yml](.github/workflows/clear_workflows.yml) | 清理工作流运行记录 | 保证Action界面整洁
 
 ---
 
-## 🐛 Troubleshooting
+## 🔧 高级功能
 
-### Common Issues
+### 自定义编译选项
 
-#### 1. Compilation Failure
+在工作流运行时，您可以配置以下参数：
 
-**Possible Causes**:
-- Network issues causing dependency download failures
-- Source code conflicts
-- Insufficient memory
+- **kernel_version**: 选择要编译的内核版本
+- **KSU Type**: 选择 KernelSU 类型 (ReSukiSU / SukiSU-Ultra)
+- **enable_susfs**: 是否启用 SUSFS（默认开启）。内核侧补丁取自 `simonpunk/susfs4ksu` 的 `gki-android15-6.6` 分支，固定 commit `f98f08223bbf`，版本 **v2.4.0**；启用时会自动把 KSU 钩子模式切到 SUSFS Inline Hook
+- **enable_zw_fix**: 是否应用 Unicode 零宽绕过修复补丁（CVE-2024-43093/CVE-2024-50089，默认开启，补丁自动从上游 ITxiao6666/Unicode_bypass_Fix 获取）
+- **Custom Flags**: 添加额外的编译标志
 
-**Solutions**:
-- Check error messages in Actions logs
-- Try re-running the workflow
-- Clean cache and recompile
+#### 使用公共缓存
+
+项目会自动从公共缓存仓库下载预编译缓存，首次编译也能享受加速效果。
+
+#### 清理旧缓存
+
+当构建时间超过 8 分钟时，会自动清理旧的 ccache 缓存，避免占用过多 GitHub 存储空间。也可手动运行 [clean-caches](.github/workflows/clean-caches.yml) 工作流清理全部缓存。
+
+---
+
+## 🐛 故障排除
+
+### 常见问题
+
+#### 1. 编译失败
+
+**可能原因**:
+- 网络问题导致依赖下载失败
+- 源代码存在冲突
+- 内存不足
+
+**解决方案**:
+- 检查 Actions 日志中的错误信息
+- 尝试重新运行工作流
+- 清理缓存后重新编译
 
 
-### Log Analysis
+### 日志分析
 
-#### Viewing Compilation Logs
+#### 查看编译日志
 
-1. Go to the **Actions** page
-2. Click on the corresponding workflow run record
-3. Expand each step to view detailed output
-4. Pay special attention to error steps
+1. 进入 **Actions** 页面
+2. 点击对应的 workflow 运行记录
+3. 展开各个步骤查看详细输出
+4. 重点关注报错步骤
 
-#### Key Log Markers
+#### 关键日志标记
 
 ```
-[INFO]    - General information
-[SUCCESS] - Successfully completed
-[ERROR]   - Error (requires immediate attention)
+[INFO]    - 一般信息
+[SUCCESS] - 成功完成
+[ERROR]   - 错误（需立即处理）
 ```
 
 ---
 
-## 🔗 Related Resources
+## 🔗 相关资源
 
-### Related Projects
+### 相关项目
 
-- [OnePlus/Realme Kernel Compilation](https://github.com/qdykernel/Build_Oneplus_Realme_Action)
-- [SukiSU-Ultra Project](https://github.com/SukiSU-Ultra/SukiSU-Ultra)
-- [ReSukiSU Project](https://github.com/ReSukiSU/ReSukiSU)
+- [OnePlus/Realme 内核编译](https://github.com/qdykernel/Build_Oneplus_Realme_Actionl)
+- [SukiSU-Ultra 项目](https://github.com/SukiSU-Ultra/SukiSU-Ultra)
+- [ReSukiSU 项目](https://github.com/ReSukiSU/ReSukiSU)
 
-### Community Support
+### 社区支持
 
-- **Telegram Channel**: [@qdykernel](https://t.me/qdykernel)
-- **CoolApk Profile**: [@qdykernel](http://www.coolapk.com/u/1624571)
-- **GitHub Issues**: [Submit Issue](https://github.com/qdykernel/Build_Lenovo_sm8750/issues)
+- **Telegram 频道**: [@qdykernel](https://t.me/qdykernel)
+- **酷安主页**: [@qdykernel](http://www.coolapk.com/u/1624571)
+- **GitHub Issues**: [提交问题](https://github.com/qdykernel/Build_Lenovo_sm8750/issues)
 
 ---
 
-## 📜 License
+## 📜 许可证
 
-This project is licensed under the **GPL-3.0** License.
+本项目采用 **GPL-3.0** 许可证。
 
 ```
 Copyright (C) 2024 qdykernel
@@ -151,20 +149,20 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 ---
 
-## 📈 Project Statistics
+## 📈 项目统计
 
 [![Star History Chart](https://api.star-history.com/svg?repos=qdykernel/Build_Lenovo_sm8750&type=Date)](https://star-history.com/#qdykernel/Build_Lenovo_sm8750&Date)
 
 ---
 
-## 📞 Contact
+## 📞 联系方式
 
-If you have any questions or suggestions, please contact us through the following methods:
+如有问题或建议，请通过以下方式联系：
 
 - **Telegram**: [@qdykernel](https://t.me/qdykernel)
-- **GitHub Issues**: [Create New Issue](https://github.com/qdykernel/Build_Lenovo_sm8750/issues)
-- **CoolApk**: DM [@Q1udaoyu](http://www.coolapk.com/u/1624571)
+- **GitHub Issues**: [新建 Issue](https://github.com/qdykernel/Build_Lenovo_sm8750/issues)
+- **酷安**: 私信 [@Q1udaoyu](http://www.coolapk.com/u/1624571)
 
 ---
 
-**Maintenance Status**: 🟢 Actively Maintained
+**维护状态**: 🟢 活跃维护中
