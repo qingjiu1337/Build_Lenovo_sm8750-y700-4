@@ -74,12 +74,21 @@ on:
         default: true
         type: boolean
 
+      enable_release:
+        description: "📢 将构建产物发布到 GitHub Releases"
+        required: false
+        default: false
+        type: boolean
+
       
        
 jobs:
   build:
     name: Build_${{ github.event.inputs.kernel_version }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
       KERNEL_VERSION: ${{ github.event.inputs.kernel_version }}
@@ -93,6 +102,7 @@ jobs:
       ENABLE_KSU_APK: ${{ github.event.inputs.enable_ksu_apk }}
       ENABLE_ZW_FIX: ${{ github.event.inputs.enable_zw_fix }}
       ENABLE_SIGNED: ${{ github.event.inputs.enable_signed }}
+      ENABLE_RELEASE: ${{ github.event.inputs.enable_release }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -901,6 +911,53 @@ jobs:
         with:
          name: Boot_${{ env.KSUVER }}_${{ env.KERNEL_VERSION }}_ReSukiSU_AOSP_Signed
          path: kernel_workspace/boot_avb_tool/AOSP-Testkey-BootSigner-main/boot.img
+
+      - name: 📢 Publish to Releases (发布到 GitHub Releases)
+        if: ${{ env.ENABLE_RELEASE == 'true' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "正在整理发布产物…"
+          STAGE=release_assets
+          rm -rf "$STAGE" && mkdir -p "$STAGE"
+          IMAGE="kernel_workspace/common/out/arch/arm64/boot/kernel"
+          BOOT="kernel_workspace/boot_avb_tool/AOSP-Testkey-BootSigner-main/boot.img"
+          [ -f "$IMAGE" ] && cp "$IMAGE" "$STAGE/Image-${KERNEL_VERSION}-KSU${KSUVER}"
+          [ -f "$BOOT" ]  && cp "$BOOT"  "$STAGE/boot-${KERNEL_VERSION}-KSU${KSUVER}-signed.img"
+          for f in manager_apk/*.apk; do [ -f "$f" ] && cp "$f" "$STAGE/"; done
+          if [ -z "$(ls -A "$STAGE")" ]; then
+            echo "::error::没有可发布的产物"
+            exit 1
+          fi
+          ls -lh "$STAGE"
+
+          TAG="KSU${KSUVER}-${KERNEL_VERSION}-${GITHUB_RUN_NUMBER}"
+          {
+            echo "## 构建信息"
+            echo
+            echo "| 项目 | 值 |"
+            echo "| --- | --- |"
+            echo "| 内核版本 | ${KERNEL_VERSION}（${os_patch_level}） |"
+            echo "| KSU | BakaSU ${KSUVER} |"
+            echo "| 提交 | \`${GITHUB_SHA:0:9}\` |"
+            echo "| 构建时间 | $(date -u '+%Y-%m-%d %H:%M UTC') |"
+            echo
+            echo "## 功能开关"
+            echo
+            echo "- SUSFS：${ENABLE_SUSFS}"
+            echo "- Manager APK：${ENABLE_KSU_APK}${MANAGER_VER:+（${MANAGER_VER}）}"
+            echo "- ADIOS：${ENABLE_ADIOS} / Re-Kernel：${ENABLE_REKERNEL} / BBG：${ENABLE_BBG}"
+            echo "- Droidspaces：${ENABLE_DROIDSPACES} / Unicode 修复：${ENABLE_ZW_FIX} / 签名 boot：${ENABLE_SIGNED}"
+            echo
+            echo "> 首次刷入若提示「数据可能已损坏」，通常是 f2fs 格式不兼容，需清除数据；刷回原 boot 可保留数据。"
+          } > release_notes.md
+
+          # 重复运行时先清掉同名 Release，保证幂等
+          gh release delete "$TAG" --yes --cleanup-tag >/dev/null 2>&1 || true
+          gh release create "$TAG" "$STAGE"/* \
+            --title "Kernel ${KERNEL_VERSION} · BakaSU ${KSUVER}" \
+            --notes-file release_notes.md \
+            --target "${GITHUB_SHA}"
 
   upload_rekernel:
     name: Upload Re-Kernel Module

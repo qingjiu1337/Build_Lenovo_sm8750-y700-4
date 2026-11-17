@@ -63,6 +63,7 @@
 - **enable_susfs**: 是否启用 SUSFS（默认开启）。内核侧补丁取自 `simonpunk/susfs4ksu` 的 `gki-android15-6.6` 分支，固定 commit `f98f08223bbf`，版本 **v2.4.0**；启用时会自动把 KSU 钩子模式切到 SUSFS Inline Hook
 - **enable_ksu_apk**: 是否附带 BakaSU Manager APK（默认开启）。产物取自 **官方 CI 最新构建**（`nightly.link` 的 `Manager-release`，免登录），内含 `arm64-v8a` 与 `universal`。开启时会解析该 APK 的版本号，并把**内核侧 KSU 源码对齐到同一版本对应的提交**，因此内核与管理器版本严格一致（而非各走各的 main）。APK 由官方密钥签名，可直接覆盖安装官方发布版；本仓库不再自建签名。若下载失败会跳过 APK 并给出提示，内核照常构建
 - **enable_zw_fix**: 是否应用 Unicode 零宽绕过修复补丁（CVE-2024-43093/CVE-2024-50089，默认开启，补丁自动从上游 ITxiao6666/Unicode_bypass_Fix 获取）
+- **enable_release**: 是否把本次产物发布到 **GitHub Releases**（默认关闭）。开启后会创建 tag 为 `KSU<版本>-<内核版本>-<运行号>` 的 Release，附带 `Image`、已签名的 `boot.img` 以及 Manager APK（若有），正文自动写入内核版本、KSU 版本、提交哈希和功能开关状态；重复运行会先清理同名 Release，保证幂等
 - **Custom Flags**: 添加额外的编译标志
 
 #### 使用公共缓存
