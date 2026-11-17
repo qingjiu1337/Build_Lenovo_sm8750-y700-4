@@ -56,6 +56,12 @@ on:
         default: true
         type: boolean
 
+      enable_ksu_apk:
+        description: "📦 一并构建与内核同版本的 BakaSU Manager APK"
+        required: false
+        default: true
+        type: boolean
+
       enable_zw_fix:
         description: "应用Unicode零宽绕过修复补丁(CVE-2024-43093/CVE-2024-50089)"
         required: false
@@ -84,6 +90,7 @@ jobs:
       ENABLE_DROIDSPACES: ${{ github.event.inputs.enable_droidspaces }}
       ENABLE_BBG: ${{ github.event.inputs.enable_bbg }}
       ENABLE_SUSFS: ${{ github.event.inputs.enable_susfs }}
+      ENABLE_KSU_APK: ${{ github.event.inputs.enable_ksu_apk }}
       ENABLE_ZW_FIX: ${{ github.event.inputs.enable_zw_fix }}
       ENABLE_SIGNED: ${{ github.event.inputs.enable_signed }}
     steps:
@@ -822,6 +829,45 @@ jobs:
         with:
          name: kernel_image_${{ env.KERNEL_VERSION }}
          path: kernel_workspace/common/out/arch/arm64/boot/kernel
+
+      - name: ☕ Setup Java 21 (配置 JDK 21)
+        if: ${{ env.ENABLE_KSU_APK == 'true' }}
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: 📦 Build Manager APK (构建同版本 Manager APK)
+        if: ${{ env.ENABLE_KSU_APK == 'true' }}
+        run: |
+          echo "正在构建与内核同版本的 BakaSU Manager APK…"
+          cd kernel_workspace/KernelSU
+          KSU_SHA=$(git rev-parse HEAD)
+          echo "KernelSU commit: $KSU_SHA"
+          echo "对应版本号: $(expr $(git rev-list --count HEAD) + 30700)"
+          cd manager
+          # 生成一次性签名密钥, 保证产物可直接安装 (与官方签名不同, 升级前需先卸载官方 Manager)
+          KS_PASS="$(openssl rand -hex 16)"
+          keytool -genkeypair -alias bakasu -keyalg RSA -keysize 2048 -validity 10000 \
+            -storepass "$KS_PASS" -keypass "$KS_PASS" -dname "CN=BakaSU Local Build" \
+            -storetype JKS -keystore key.jks
+          {
+            echo "KEYSTORE_FILE=key.jks"
+            echo "KEYSTORE_PASSWORD=$KS_PASS"
+            echo "KEY_ALIAS=bakasu"
+            echo "KEY_PASSWORD=$KS_PASS"
+          } >> gradle.properties
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleRelease -Pcommit="$KSU_SHA"
+          echo "--- 构建产物 ---"
+          ls -lh app/build/outputs/apk/release/
+
+      - name: 📤 Upload Manager APK (上传 Manager APK)
+        if: ${{ env.ENABLE_KSU_APK == 'true' }}
+        uses: actions/upload-artifact@v5
+        with:
+          name: BakaSU_Manager_${{ env.KSUVER }}
+          path: kernel_workspace/KernelSU/manager/app/build/outputs/apk/release/*.apk
          
       - name: 📦 Sign boot using AOSP test key (使用AOSP测试密钥签名boot)
         if: ${{ env.ENABLE_SIGNED == 'true' }}
