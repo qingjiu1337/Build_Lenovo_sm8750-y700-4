@@ -57,7 +57,7 @@ on:
         type: boolean
 
       enable_ksu_apk:
-        description: "📦 一并构建与内核同版本的 BakaSU Manager APK"
+        description: "📦 附带 BakaSU Manager APK（取自官方 CI 最新产物，非自建）"
         required: false
         default: true
         type: boolean
@@ -830,61 +830,36 @@ jobs:
          name: kernel_image_${{ env.KERNEL_VERSION }}
          path: kernel_workspace/common/out/arch/arm64/boot/kernel
 
-      - name: ☕ Setup Java 21 (配置 JDK 21)
+      - name: 📥 Download official Manager APK (下载官方 CI 版 Manager APK)
         if: ${{ env.ENABLE_KSU_APK == 'true' }}
-        uses: actions/setup-java@v6
-        with:
-          distribution: temurin
-          java-version: '21'
-
-      - name: 📦 Build Manager APK (构建同版本 Manager APK)
-        if: ${{ env.ENABLE_KSU_APK == 'true' }}
-        env:
-          KSU_KEYSTORE_B64: ${{ secrets.KSU_KEYSTORE_B64 }}
-          KSU_KEYSTORE_PASSWORD: ${{ secrets.KSU_KEYSTORE_PASSWORD }}
-          KSU_KEY_ALIAS: ${{ secrets.KSU_KEY_ALIAS }}
-          KSU_KEY_PASSWORD: ${{ secrets.KSU_KEY_PASSWORD }}
         run: |
-          echo "正在构建与内核同版本的 BakaSU Manager APK…"
-          cd kernel_workspace/KernelSU
-          KSU_SHA=$(git rev-parse HEAD)
-          echo "KernelSU commit: $KSU_SHA"
-          echo "对应版本号: $(expr $(git rev-list --count HEAD) + 30700)"
-          cd manager
-          if [ -n "${KSU_KEYSTORE_B64:-}" ]; then
-            echo "==> 使用 Secrets 中的固定签名密钥 (KSU_KEYSTORE_B64)"
-            printf '%s' "$KSU_KEYSTORE_B64" | base64 -d > key.jks
-            KS_PASS="$KSU_KEYSTORE_PASSWORD"
-            KS_ALIAS="${KSU_KEY_ALIAS:-bakasu}"
-            KS_KEYPASS="${KSU_KEY_PASSWORD:-$KSU_KEYSTORE_PASSWORD}"
-          else
-            echo "::warning::未配置 KSU_KEYSTORE_B64，本次改用一次性密钥签名；下次构建签名会变，覆盖安装需先卸载"
-            KS_PASS="$(openssl rand -hex 16)"
-            KS_ALIAS="bakasu"
-            KS_KEYPASS="$KS_PASS"
-            keytool -genkeypair -alias "$KS_ALIAS" -keyalg RSA -keysize 2048 -validity 10000 \
-              -storepass "$KS_PASS" -keypass "$KS_KEYPASS" \
-              -dname "CN=BakaSU Local Build" -storetype JKS -keystore key.jks
+          echo "正在下载 BakaSU 官方 CI 构建的 Manager APK…"
+          mkdir -p manager_apk
+          URL="https://nightly.link/Baka-SU/BakaSU/workflows/build-manager/main/Manager-release.zip"
+          if ! curl -fLSs --retry 3 --retry-delay 5 "$URL" -o manager_apk/release.zip; then
+            echo "::error::官方 CI 产物下载失败: $URL"
+            echo "可手动下载核对: https://nightly.link/Baka-SU/BakaSU/workflows/build-manager/main"
+            exit 1
           fi
-          {
-            echo "KEYSTORE_FILE=key.jks"
-            echo "KEYSTORE_PASSWORD=$KS_PASS"
-            echo "KEY_ALIAS=$KS_ALIAS"
-            echo "KEY_PASSWORD=$KS_KEYPASS"
-          } >> gradle.properties
-          echo "==> 签名证书指纹:"
-          keytool -list -v -keystore key.jks -storepass "$KS_PASS" 2>/dev/null | grep -iE "SHA1:|SHA-256:" | head -2 || true
-          chmod +x gradlew
-          ./gradlew --no-daemon assembleRelease -Pcommit="$KSU_SHA"
-          echo "--- 构建产物 ---"
-          ls -lh app/build/outputs/apk/release/
+          unzip -o -q manager_apk/release.zip -d manager_apk
+          rm -f manager_apk/release.zip
+          # 本机型只需 arm64-v8a, 顺带保留 universal 备用
+          find manager_apk -maxdepth 1 -name '*.apk' ! -name '*arm64-v8a*' ! -name '*universal*' -delete
+          echo "--- 下载到的 APK ---"
+          ls -lh manager_apk/*.apk
+          APK_VER=$(basename "$(ls manager_apk/*arm64-v8a*.apk 2>/dev/null | head -1)" | sed -E 's/.*_([0-9]+)-arm64.*/\1/')
+          echo "MANAGER_VER=$APK_VER" >> $GITHUB_ENV
+          echo "官方 CI 管理器版本号: $APK_VER  (本次内核: $KSUVER)"
+          if [ -n "$APK_VER" ] && [ "$APK_VER" != "$KSUVER" ]; then
+            echo "::warning::管理器版本 $APK_VER 与内核版本 $KSUVER 不一致，官方 CI 通常滞后于 main 最新提交，一般不影响使用"
+          fi
 
       - name: 📤 Upload Manager APK (上传 Manager APK)
         if: ${{ env.ENABLE_KSU_APK == 'true' }}
         uses: actions/upload-artifact@v5
         with:
-          name: BakaSU_Manager_${{ env.KSUVER }}
-          path: kernel_workspace/KernelSU/manager/app/build/outputs/apk/release/*.apk
+          name: BakaSU_Manager_${{ env.MANAGER_VER }}
+          path: manager_apk/*.apk
          
       - name: 📦 Sign boot using AOSP test key (使用AOSP测试密钥签名boot)
         if: ${{ env.ENABLE_SIGNED == 'true' }}
