@@ -61,7 +61,7 @@ During workflow execution, you can configure the following parameters:
 - **kernel_version**: Select the kernel version to compile
 - **KSU Type**: Choose KernelSU type (ReSukiSU / SukiSU-Ultra)
 - **enable_susfs**: Whether to enable SUSFS (on by default). Kernel-side patches come from `simonpunk/susfs4ksu` branch `gki-android15-6.6`, pinned to commit `f98f08223bbf`, version **v2.4.0**; enabling it also switches the KSU hook mode to SUSFS Inline Hook
-- **enable_ksu_apk**: Whether to also build a BakaSU Manager APK matching the kernel version (on by default). It is compiled from the same KernelSU source tree that the kernel build fetches, so the version number corresponds exactly; it is signed with a throwaway key, so uninstall the official Manager before installing over it
+- **enable_ksu_apk**: Whether to also build a BakaSU Manager APK matching the kernel version (on by default). It is compiled from the same KernelSU source tree that the kernel build fetches, so the version number corresponds exactly. Signing prefers repository Secrets (`KSU_KEYSTORE_B64` / `KSU_KEYSTORE_PASSWORD` / `KSU_KEY_ALIAS` / `KSU_KEY_PASSWORD`); when configured, the signature is stable across builds and in-place upgrades work. Otherwise it falls back to a throwaway key, so every build gets a different signature. It still differs from the official signature, so uninstall the official Manager before installing over it
 - **enable_zw_fix**: Whether to apply the Unicode zero-width bypass fix patch (CVE-2024-43093/CVE-2024-50089, enabled by default; patches auto-fetched from upstream ITxiao6666/Unicode_bypass_Fix)
 - **Custom Flags**: Add additional compilation flags
 

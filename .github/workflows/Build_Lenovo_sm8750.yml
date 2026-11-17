@@ -839,6 +839,11 @@ jobs:
 
       - name: 📦 Build Manager APK (构建同版本 Manager APK)
         if: ${{ env.ENABLE_KSU_APK == 'true' }}
+        env:
+          KSU_KEYSTORE_B64: ${{ secrets.KSU_KEYSTORE_B64 }}
+          KSU_KEYSTORE_PASSWORD: ${{ secrets.KSU_KEYSTORE_PASSWORD }}
+          KSU_KEY_ALIAS: ${{ secrets.KSU_KEY_ALIAS }}
+          KSU_KEY_PASSWORD: ${{ secrets.KSU_KEY_PASSWORD }}
         run: |
           echo "正在构建与内核同版本的 BakaSU Manager APK…"
           cd kernel_workspace/KernelSU
@@ -846,17 +851,29 @@ jobs:
           echo "KernelSU commit: $KSU_SHA"
           echo "对应版本号: $(expr $(git rev-list --count HEAD) + 30700)"
           cd manager
-          # 生成一次性签名密钥, 保证产物可直接安装 (与官方签名不同, 升级前需先卸载官方 Manager)
-          KS_PASS="$(openssl rand -hex 16)"
-          keytool -genkeypair -alias bakasu -keyalg RSA -keysize 2048 -validity 10000 \
-            -storepass "$KS_PASS" -keypass "$KS_PASS" -dname "CN=BakaSU Local Build" \
-            -storetype JKS -keystore key.jks
+          if [ -n "${KSU_KEYSTORE_B64:-}" ]; then
+            echo "==> 使用 Secrets 中的固定签名密钥 (KSU_KEYSTORE_B64)"
+            printf '%s' "$KSU_KEYSTORE_B64" | base64 -d > key.jks
+            KS_PASS="$KSU_KEYSTORE_PASSWORD"
+            KS_ALIAS="${KSU_KEY_ALIAS:-bakasu}"
+            KS_KEYPASS="${KSU_KEY_PASSWORD:-$KSU_KEYSTORE_PASSWORD}"
+          else
+            echo "::warning::未配置 KSU_KEYSTORE_B64，本次改用一次性密钥签名；下次构建签名会变，覆盖安装需先卸载"
+            KS_PASS="$(openssl rand -hex 16)"
+            KS_ALIAS="bakasu"
+            KS_KEYPASS="$KS_PASS"
+            keytool -genkeypair -alias "$KS_ALIAS" -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass "$KS_PASS" -keypass "$KS_KEYPASS" \
+              -dname "CN=BakaSU Local Build" -storetype JKS -keystore key.jks
+          fi
           {
             echo "KEYSTORE_FILE=key.jks"
             echo "KEYSTORE_PASSWORD=$KS_PASS"
-            echo "KEY_ALIAS=bakasu"
-            echo "KEY_PASSWORD=$KS_PASS"
+            echo "KEY_ALIAS=$KS_ALIAS"
+            echo "KEY_PASSWORD=$KS_KEYPASS"
           } >> gradle.properties
+          echo "==> 签名证书指纹:"
+          keytool -list -v -keystore key.jks -storepass "$KS_PASS" 2>/dev/null | grep -iE "SHA1:|SHA-256:" | head -2 || true
           chmod +x gradlew
           ./gradlew --no-daemon assembleRelease -Pcommit="$KSU_SHA"
           echo "--- 构建产物 ---"

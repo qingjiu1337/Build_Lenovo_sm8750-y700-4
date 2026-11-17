@@ -61,7 +61,7 @@
 - **kernel_version**: 选择要编译的内核版本
 - **KSU Type**: 选择 KernelSU 类型 (ReSukiSU / SukiSU-Ultra)
 - **enable_susfs**: 是否启用 SUSFS（默认开启）。内核侧补丁取自 `simonpunk/susfs4ksu` 的 `gki-android15-6.6` 分支，固定 commit `f98f08223bbf`，版本 **v2.4.0**；启用时会自动把 KSU 钩子模式切到 SUSFS Inline Hook
-- **enable_ksu_apk**: 是否一并构建与内核同版本的 BakaSU Manager APK（默认开启）。直接使用内核构建时拉取的同一份 KernelSU 源码树编译，版本号与内核严格对应；使用一次性密钥签名，与官方签名不同，覆盖安装官方 Manager 前需先卸载
+- **enable_ksu_apk**: 是否一并构建与内核同版本的 BakaSU Manager APK（默认开启）。直接使用内核构建时拉取的同一份 KernelSU 源码树编译，版本号与内核严格对应。签名优先读取仓库 Secrets（`KSU_KEYSTORE_B64` / `KSU_KEYSTORE_PASSWORD` / `KSU_KEY_ALIAS` / `KSU_KEY_PASSWORD`），配置后每次构建签名固定、可覆盖升级；未配置则退化为一次性密钥，每次构建签名都不同。与官方签名不同，覆盖安装官方 Manager 前需先卸载
 - **enable_zw_fix**: 是否应用 Unicode 零宽绕过修复补丁（CVE-2024-43093/CVE-2024-50089，默认开启，补丁自动从上游 ITxiao6666/Unicode_bypass_Fix 获取）
 - **Custom Flags**: 添加额外的编译标志
 
