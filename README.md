@@ -12,7 +12,7 @@
 
 ## 📖 项目简介
 
-本项目提供基于 **GitHub Actions** 的自动化内核编译工作流，支持 **Lenovo** 搭载 **SM8750** 平台的设备。通过高度集成的脚本，实现一键编译包含 **(Re)SukiSU**、**KPM**、**ADIOS调度** 等功能的 GKI 内核（已移除 SUSFS 支持，KPM patch 工具固定为 0.13.0 不再更新）。
+本项目提供基于 **GitHub Actions** 的自动化内核编译工作流，支持 **Lenovo** 搭载 **SM8750** 平台的设备。通过高度集成的脚本，实现一键编译包含 **BakaSU（原 ReSukiSU）**、**SUSFS**、**ADIOS调度** 等功能的 GKI 内核（已移除 KPM 支持，KSU 内核源始终跟随上游最新 main）。
 
 ### ✨ 主要特性
 
@@ -46,7 +46,7 @@
 
 | 工作流 | 说明 | 适用场景 |
 |--------|------|----------|
-| [build.yml](.github/workflows/build.yml) | 完整内核编译（含 KSU/KPM 等） | 集成KSU获取ROOT |
+| [build.yml](.github/workflows/build.yml) | 完整内核编译（含 KSU 等） | 集成KSU获取ROOT |
 | [clean-caches.yml](.github/workflows/clean-caches.yml) | 清理 ccache 缓存 | 缓存异常或需要重新编译时 |
 | [clear_workflows.yml](.github/workflows/clear_workflows.yml) | 清理工作流运行记录 | 保证Action界面整洁
 
@@ -60,9 +60,7 @@
 
 - **kernel_version**: 选择要编译的内核版本
 - **KSU Type**: 选择 KernelSU 类型 (ReSukiSU / SukiSU-Ultra)
-- **Enable KPM**: 是否启用 KPM（patch 工具固定为 0.12.2，与固定内核源配对）
-- **ksu_version**: ReSukiSU 内核源 — 默认 `kpm` 固定到最后支持 KPM 的版本（main@a13d71f6，内核版本号 34943）；`latest` 跟随上游（上游已于 2026-06-06 移除 KPM，不再支持）
-- **enable_ksu_apk**: 是否在构建产物中附带固定版 ReSukiSU Manager APK（v4.1.0_34965，随仓库 `apk/` 目录分发）
+- **enable_susfs**: 是否启用 SUSFS（默认开启）。内核侧补丁取自 `simonpunk/susfs4ksu` 的 `gki-android15-6.6` 分支，固定 commit `f98f08223bbf`，版本 **v2.4.0**；启用时会自动把 KSU 钩子模式切到 SUSFS Inline Hook
 - **enable_zw_fix**: 是否应用 Unicode 零宽绕过修复补丁（CVE-2024-43093/CVE-2024-50089，默认开启，补丁自动从上游 ITxiao6666/Unicode_bypass_Fix 获取）
 - **Custom Flags**: 添加额外的编译标志
 
