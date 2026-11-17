@@ -50,26 +50,11 @@ on:
         default: false
         type: boolean
 
-      enable_kpm:
-        description: "启用KPM"
+      enable_susfs:
+        description: "🕶 启用 SUSFS (v2.4.0，含内核侧补丁)"
         required: false
         default: true
         type: boolean
-
-      enable_ksu_apk:
-        description: "📦 构建附带固定版ReSukiSU Manager APK (v4.1.0_34965)"
-        required: true
-        default: true
-        type: boolean
-
-      ksu_version:
-        description: "📌 ReSukiSU 内核源（kpm=固定到最后支持KPM的版本34943；latest=跟随上游，已无KPM）"
-        required: true
-        type: choice
-        options:
-          - 'kpm'
-          - 'latest'
-        default: 'kpm'
 
       enable_zw_fix:
         description: "应用Unicode零宽绕过修复补丁(CVE-2024-43093/CVE-2024-50089)"
@@ -98,10 +83,8 @@ jobs:
       ENABLE_ADIOS: ${{ github.event.inputs.enable_Adios }}
       ENABLE_DROIDSPACES: ${{ github.event.inputs.enable_droidspaces }}
       ENABLE_BBG: ${{ github.event.inputs.enable_bbg }}
-      ENABLE_KPM: ${{ github.event.inputs.enable_kpm }}
-      ENABLE_KSU_APK: ${{ github.event.inputs.enable_ksu_apk }}
+      ENABLE_SUSFS: ${{ github.event.inputs.enable_susfs }}
       ENABLE_ZW_FIX: ${{ github.event.inputs.enable_zw_fix }}
-      KSU_REF: ${{ github.event.inputs.ksu_version }}
       ENABLE_SIGNED: ${{ github.event.inputs.enable_signed }}
     steps:
       - uses: actions/checkout@v5
@@ -188,7 +171,7 @@ jobs:
           sudo chmod +x /usr/bin/ccache &&
           rm -f ./ccache &
           echo "正在克隆源码仓库..."
-          aria2c -s16 -x16 -k1M "https://github.com/showdo/Build_Lenovo_sm8750/releases/download/common/${{ env.os_patch_level }}.tar.gz" -o common.tar.gz && \
+          aria2c -s16 -x16 -k1M "https://github.com/qdykernel/Build_Lenovo_sm8750/releases/download/common/${{ env.os_patch_level }}.tar.gz" -o common.tar.gz && \
           mkdir -p common && \
           tar -xzf common.tar.gz -C common && \
           rm -f common.tar.gz &
@@ -452,6 +435,28 @@ jobs:
           git apply -p1 < 001-lz4.patch || true
           patch -p1 < 002-zstd.patch || true
           
+      - name: 🔧 Apply SUSFS v2.4.0 (应用 SUSFS 内核补丁)
+        if: ${{ env.ENABLE_SUSFS == 'true' }}
+        run: |
+          echo "正在应用 SUSFS v2.4.0 (simonpunk/susfs4ksu @ f98f08223bbf, 分支 gki-android15-6.6)…"
+          cd kernel_workspace/common
+          SUSFS_BASE="https://gitlab.com/simonpunk/susfs4ksu/-/raw/f98f08223bbf/kernel_patches"
+          # 补丁本体只含既有文件的 hook, 新增的 susfs.c / susfs.h / susfs_def.h 需单独落盘
+          curl -fLSs "$SUSFS_BASE/50_add_susfs_in_gki-android15-6.6.patch" -o /tmp/susfs.patch
+          curl -fLSs "$SUSFS_BASE/fs/susfs.c" -o fs/susfs.c
+          curl -fLSs "$SUSFS_BASE/include/linux/susfs.h" -o include/linux/susfs.h
+          curl -fLSs "$SUSFS_BASE/include/linux/susfs_def.h" -o include/linux/susfs_def.h
+          echo "补丁体积: $(wc -c < /tmp/susfs.patch) 字节"
+          grep -m1 'SUSFS_VERSION' include/linux/susfs.h
+          # 先 dry-run, 避免半途 reject 把内核树搞脏
+          if ! patch -p1 --dry-run --forward < /tmp/susfs.patch > /tmp/susfs_dryrun.log 2>&1; then
+            echo "::error::SUSFS 补丁与当前内核树不匹配, 构建中止"
+            grep -E "FAILED|Hunk|rej" /tmp/susfs_dryrun.log | tail -30
+            exit 1
+          fi
+          patch -p1 --forward < /tmp/susfs.patch
+          echo "SUSFS 补丁应用完成"
+
       - name: 🛠 Set Baseband-guard (配置BBG基带守护)
         if: ${{ env.ENABLE_BBG == 'true' }}
         run: |
@@ -462,36 +467,18 @@ jobs:
           sed -i '/^config LSM$/,/^help$/{ /^[[:space:]]*default/ { /baseband_guard/! s/lockdown/lockdown,baseband_guard/ } }' ./common/security/Kconfig
 
       
-      - name: ⚙️ Set ReSukiSU (设置ReSukiSU)
+      - name: ⚙️ Set KSU (设置KSU内核源)
         run: |
           cd kernel_workspace
-          echo "正在配置ReSukiSU..."
-          # kpm    = 固定到 ReSukiSU main@a13d71f6 (rev-count 4243, 内核版本号 34943)
-          #          这是上游最后一个包含 KPM 支持的提交（下一个提交 faac3098 于 2026-06-06 移除了 KPM）
-          # latest = 跟随上游 main 分支（注意：上游已移除 KPM 支持）
-          case "${{ env.KSU_REF }}" in
-            "latest")
-              KSU_COMMIT="main"
-              echo "⚠️ 跟随上游 ReSukiSU main 分支（上游已移除 KPM 支持）"
-              ;;
-            *)
-              KSU_COMMIT="a13d71f699093f0c1da7ba442881eccaa8e4321a"
-              echo "使用固定版本 ReSukiSU（最后支持KPM）commit $KSU_COMMIT"
-              ;;
-          esac
-          curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/refs/heads/main/kernel/setup.sh" | bash -s $KSU_COMMIT
+          echo "正在配置 KSU（跟随上游 BakaSU main）..."
+          # 上游已于 2026-06-06 (faac3098) 移除 KPM，本项目不再保留 KPM 支持，
+          # 因此固定版本 a13d71f6 的 KPM 分支逻辑与旧版 Manager APK 一并移除，始终跟随最新 main。
+          curl -LSs "https://raw.githubusercontent.com/Baka-SU/BakaSU/refs/heads/main/kernel/setup.sh" | bash -s main
           cd ./KernelSU
-          # 版本号按官方公式由本地检出的源码树计算：固定 KPM 版时结果恒为 34943
+          # 版本号按官方公式由本地检出的源码树计算
           KSU_VERSION=$(expr $(git rev-list --count HEAD) + 30700 2>/dev/null || echo 114514)
           echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
           echo "ksuver=$KSU_VERSION" >> $GITHUB_OUTPUT
-
-      - name: 📦 Upload fixed ReSukiSU Manager APK (上传固定版Manager APK)
-        if: ${{ env.ENABLE_KSU_APK == 'true' }}
-        uses: actions/upload-artifact@v5
-        with:
-          name: ReSukiSU_Manager_v4.1.0_34965
-          path: apk/ReSukiSU_v4.1.0_34965-arm64-v8a-release.apk
 
       - name: 🔧 Apply Droidspaces SYSVIPC kABI fix (应用 Droidspaces SYSVIPC kABI 修复)
         if: ${{ env.ENABLE_DROIDSPACES == 'true' }}
@@ -634,7 +621,17 @@ jobs:
 
           # ==================== KSU 配置 ====================
           echo "CONFIG_KSU=y" >> "$DEFCONFIG"
-          echo "CONFIG_KPM=y" >> "$DEFCONFIG"
+
+          if [ "${{ env.ENABLE_SUSFS }}" = "true" ]; then
+            # SUSFS 使用 Inline Hook, 与 Tracepoint Hook 同属 Kconfig choice, 必须显式关掉后者
+            echo "# CONFIG_KSU_TRACEPOINT_HOOK is not set" >> "$DEFCONFIG"
+            echo "CONFIG_KSU_SUSFS=y" >> "$DEFCONFIG"
+            for susfs_opt in SUS_PATH SUS_MOUNT SUS_KSTAT SPOOF_UNAME \
+                              HIDE_KSU_SUSFS_SYMBOLS SPOOF_CMDLINE_OR_BOOTCONFIG \
+                              OPEN_REDIRECT SUS_MAP; do
+              echo "CONFIG_KSU_SUSFS_${susfs_opt}=y" >> "$DEFCONFIG"
+            done
+          fi
 
           echo 'CONFIG_KSU_FULL_NAME_FORMAT="%TAG_NAME%-%COMMIT_SHA%-Re-TG@qdykernel"' >> "$DEFCONFIG"
 
@@ -683,6 +680,13 @@ jobs:
           echo "sloppiness = file_stat_matches,include_file_ctime,include_file_mtime,pch_defines,file_macro,time_macros" >> "$CCACHE_DIR/ccache.conf"
           
           cd kernel_workspace/common
+          # 修复: ubuntu-latest 已滚动到 Ubuntu 26.04, 新版 glibc 头文件下 strchr() 会保留 const 限定,
+          # 而内核 tools/lib/bpf/Makefile 里硬编码了 `override CFLAGS += -Werror -Wall`,
+          # 导致 libbpf.c:11255 的 next_path = strchr(s, ':') 报
+          # -Werror,-Wincompatible-pointer-types-discards-qualifiers 而中断构建。
+          # KCFLAGS+=-Wno-error 只作用于内核本体, 对宿主机工具无效, 故统一移除 tools/ 下的 -Werror。
+          grep -rl -- '-Werror' tools/ | xargs -r sed -i 's/-Werror//g'
+          echo "已移除 tools/ 下宿主机工具的 -Werror"
           wget https://github.com/cctv18/oppo_oplus_realme_sm8750/raw/refs/heads/main/lib/libfakestat.so
           wget https://github.com/cctv18/oppo_oplus_realme_sm8750/raw/refs/heads/main/lib/libfaketimeMT.so
           chmod 777 ./*.so
@@ -808,19 +812,6 @@ jobs:
 
             core.info(`旧缓存清理完成，共删除 ${deleted} 个缓存`);
 
-      - name: 📦 Apply KPM and patch the kernel (应用KPM并修补内核)
-        if: ${{ env.ENABLE_KPM == 'true' }}
-        run: |
-          echo "正在应用KPM并修补内核..."
-          cd kernel_workspace/common/out/arch/arm64/boot
-          # KPM patch 工具固定为 0.12.2：与固定内核源（最后支持KPM的 v4.1.x 时代代码）配对，
-          # 是该时代验证可用的版本组合，不再跟随上游更新
-          curl -LO https://github.com/SukiSU-Ultra/SukiSU_KernelPatch_patch/releases/download/0.12.2/patch_linux
-          chmod +x patch_linux
-          ./patch_linux
-          rm -f Image
-          mv oImage Image
-          
       - name: 📦 ReName Image  (修改镜像名)
         run: |
           cd kernel_workspace/common/out/arch/arm64/boot
