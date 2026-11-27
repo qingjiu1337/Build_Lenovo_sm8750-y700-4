@@ -14,6 +14,7 @@ on:
           - '6.6.89'
           - '6.6.102'
           - '6.6.118'
+          - '6.6.139'
         default: '6.6.89'
         
       custom_kernel_suffix:
@@ -127,6 +128,10 @@ jobs:
               echo "os_patch_level=2026-01" >> $GITHUB_ENV
               echo "releases=TB322_ZUXOS_1.5.10.183" >> $GITHUB_ENV
               ;;
+            "6.6.139")
+              echo "os_patch_level=2026-11" >> $GITHUB_ENV
+              echo "releases=TB322_ZUXOS_2.5.10.018" >> $GITHUB_ENV
+              ;;
           esac
            if [ -z "${{ env.CUSTOM_KERNEL_SUFFIX }}" ]; then
             case "${{ env.KERNEL_VERSION }}" in
@@ -141,6 +146,9 @@ jobs:
                 ;;
               "6.6.118")
                 DEFAULT_SUFFIX='-android15-8-g350f378eb496-ab14943902-4k'
+                ;;
+              "6.6.139")
+                DEFAULT_SUFFIX='-android15-8-g5d4cdf2ffe45-ab16023396-4k'
                 ;;
             esac
             echo "DEFAULT_SUFFIX=$DEFAULT_SUFFIX" >> $GITHUB_ENV
@@ -162,6 +170,10 @@ jobs:
                 ;;
               6.6.118)
                 KERNEL_TIME='Thu Feb 26 02:40:50 UTC 2026'
+                ;;
+              6.6.139)
+                # TODO: 填入设备 `uname -v` 的真实时间；留空则回退为构建当时的时间
+                KERNEL_TIME=''
                 ;;
             esac
             echo "KERNEL_TIME=$KERNEL_TIME" >> $GITHUB_ENV
@@ -188,7 +200,13 @@ jobs:
           sudo chmod +x /usr/bin/ccache &&
           rm -f ./ccache &
           echo "正在克隆源码仓库..."
-          aria2c -s16 -x16 -k1M "https://github.com/qdykernel/Build_Lenovo_sm8750/releases/download/common/${{ env.os_patch_level }}.tar.gz" -o common.tar.gz && \
+          # 旧版本(6.6.56~6.6.118)的预打包源码在上游 common release；新版本(6.6.139+)需自行打包并上传到本仓库的 common release
+          SRC_REPO="qdykernel/Build_Lenovo_sm8750"
+          if [ "${{ env.os_patch_level }}" = "2026-11" ]; then
+            SRC_REPO="${{ github.repository }}"
+          fi
+          echo "源码来源: https://github.com/${SRC_REPO}/releases/download/common/${{ env.os_patch_level }}.tar.gz"
+          aria2c -s16 -x16 -k1M "https://github.com/${SRC_REPO}/releases/download/common/${{ env.os_patch_level }}.tar.gz" -o common.tar.gz && \
           mkdir -p common && \
           tar -xzf common.tar.gz -C common && \
           rm -f common.tar.gz &
