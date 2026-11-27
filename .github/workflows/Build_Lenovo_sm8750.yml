@@ -910,21 +910,32 @@ jobs:
         if: ${{ env.ENABLE_SIGNED == 'true' }}
         run: |
           cd kernel_workspace
-          aria2c -s16 -x16 -k1M "https://github.com/showdo/AOSP-Testkey-BootSigner/archive/refs/heads/main.tar.gz" -o boot_avb_tool.tar.gz && \
-          mkdir -p boot_avb_tool && \
-          tar -xzf boot_avb_tool.tar.gz -C boot_avb_tool && \
-          rm -f boot_avb_tool.tar.gz && \
+          if ! aria2c -s16 -x16 -k1M "https://github.com/showdo/AOSP-Testkey-BootSigner/archive/refs/heads/main.tar.gz" -o boot_avb_tool.tar.gz; then
+            echo "::warning::签名工具下载失败，跳过签名"
+            exit 0
+          fi
+          mkdir -p boot_avb_tool
+          tar -xzf boot_avb_tool.tar.gz -C boot_avb_tool
+          rm -f boot_avb_tool.tar.gz
           cp ./common/out/arch/arm64/boot/Image ./boot_avb_tool/AOSP-Testkey-BootSigner-main/kernel
-          cd boot_avb_tool/AOSP-Testkey-BootSigner-main && \
-          curl -L -o boot.img https://github.com/showdo/AOSP-Testkey-BootSigner/releases/download/${{ env.releases }}/boot.img
+          cd boot_avb_tool/AOSP-Testkey-BootSigner-main
+          if ! curl -fL -o boot.img "https://github.com/showdo/AOSP-Testkey-BootSigner/releases/download/${{ env.releases }}/boot.img"; then
+            echo "::warning::未找到 ${{ env.releases }} 对应的官方 boot.img，跳过签名"
+            echo "::warning::可自行用 APatch / magiskboot 将 Image 打入设备 boot.img"
+            exit 0
+          fi
           chmod +x ./tools/magiskboot
-          ./tools/magiskboot repack boot.img
+          if ! ./tools/magiskboot repack boot.img; then
+            echo "::warning::magiskboot repack 失败，跳过签名"
+            exit 0
+          fi
           rm -f ./boot.img kernel
           mv ./new-boot.img ./boot.img
           python3 rebuild_avb.py --chained-mode
 
       - name: 📤 Upload Signed boot (上传已签名的 boot)
         if: ${{ env.ENABLE_SIGNED == 'true' }}
+        continue-on-error: true
         uses: actions/upload-artifact@v5
         with:
          name: Boot_${{ env.KSUVER }}_${{ env.KERNEL_VERSION }}_ReSukiSU_AOSP_Signed
