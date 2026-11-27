@@ -10,7 +10,6 @@ on:
         required: false
         type: choice
         options:
-          - '6.6.56'
           - '6.6.89'
           - '6.6.102'
           - '6.6.118'
@@ -33,22 +32,10 @@ on:
         default: false
         type: boolean
 
-      enable_ReKernel:
-        description: "启用Re-Kernel支持"
-        required: false
-        default: true
-        type: boolean
-      
       enable_Adios:
         description: "启用ADIOS IO调度器支持"
         required: true
         default: true
-        type: boolean
-
-      enable_droidspaces:
-        description: "添加 Droidspaces"
-        required: true
-        default: false
         type: boolean
 
       enable_susfs:
@@ -81,8 +68,6 @@ on:
         default: false
         type: boolean
 
-      
-       
 jobs:
   build:
     name: Build_${{ github.event.inputs.kernel_version }}
@@ -95,9 +80,7 @@ jobs:
       KERNEL_VERSION: ${{ github.event.inputs.kernel_version }}
       CUSTOM_KERNEL_SUFFIX: ${{ github.event.inputs.custom_kernel_suffix }}
       CUSTOM_KERNEL_TIME: ${{ github.event.inputs.custom_kernel_time }}
-      ENABLE_REKERNEL: ${{ github.event.inputs.enable_ReKernel }}
       ENABLE_ADIOS: ${{ github.event.inputs.enable_Adios }}
-      ENABLE_DROIDSPACES: ${{ github.event.inputs.enable_droidspaces }}
       ENABLE_BBG: ${{ github.event.inputs.enable_bbg }}
       ENABLE_SUSFS: ${{ github.event.inputs.enable_susfs }}
       ENABLE_KSU_APK: ${{ github.event.inputs.enable_ksu_apk }}
@@ -112,10 +95,6 @@ jobs:
         run: |
           echo "KERNEL_TIME=${{ env.CUSTOM_KERNEL_TIME }}" >> $GITHUB_ENV
           case "${{ env.KERNEL_VERSION }}" in
-            "6.6.56")
-              echo "os_patch_level=2024-11" >> $GITHUB_ENV
-              echo "releases=TB322FC_1.1.11.120" >> $GITHUB_ENV
-              ;;
             "6.6.89")
               echo "os_patch_level=2025-06" >> $GITHUB_ENV
               echo "releases=ColorOS_16_400_OPD_Boot" >> $GITHUB_ENV
@@ -135,9 +114,6 @@ jobs:
           esac
            if [ -z "${{ env.CUSTOM_KERNEL_SUFFIX }}" ]; then
             case "${{ env.KERNEL_VERSION }}" in
-              "6.6.56")
-                DEFAULT_SUFFIX='-android15-8-g38447e018c92-ab12829524-4k'
-                ;;
               "6.6.89")
                 DEFAULT_SUFFIX='-android15-8-g14220ae4ce65-ab13680582-4k'
                 ;;
@@ -159,9 +135,6 @@ jobs:
           fi
           if [ -z "${{ env.CUSTOM_KERNEL_TIME }}" ]; then
             case "${{ env.KERNEL_VERSION }}" in
-              6.6.56)
-                KERNEL_TIME='Thu Dec 19 17:58:46 UTC 2024'
-                ;;
               6.6.89)
                 KERNEL_TIME='Mon Jun 23 07:30:57 UTC 2025'
                 ;;
@@ -200,7 +173,7 @@ jobs:
           sudo chmod +x /usr/bin/ccache &&
           rm -f ./ccache &
           echo "正在克隆源码仓库..."
-          # 旧版本(6.6.56~6.6.118)的预打包源码在上游 common release；新版本(6.6.139+)需自行打包并上传到本仓库的 common release
+          # 旧版本(6.6.89~6.6.118)的预打包源码在上游 common release；新版本(6.6.139+)需自行打包并上传到本仓库的 common release
           SRC_REPO="qdykernel/Build_Lenovo_sm8750"
           if [ "${{ env.os_patch_level }}" = "2026-11" ]; then
             SRC_REPO="${{ github.repository }}"
@@ -211,7 +184,6 @@ jobs:
           tar -xzf common.tar.gz -C common && \
           rm -f common.tar.gz &
 
-          
           echo "正在克隆llvm-clang18工具链..." &&
           mkdir -p clang18 &&
           aria2c -s16 -x16 -k1M https://github.com/cctv18/oneplus_sm8650_toolchain/releases/download/LLVM-Clang18-r510928/clang-r510928.zip -o clang.zip &&
@@ -238,11 +210,7 @@ jobs:
         run: |
           echo "CCACHE_DIR=$HOME/.ccache_${{ env.KERNEL_VERSION }}" >> $GITHUB_ENV
           echo "CCACHE_MAXSIZE=10G" >> $GITHUB_ENV
-          # 根据影响源码的功能开关生成缓存变体后缀，避免不同变体互相污染
           CACHE_VARIANT=""
-          if [ "${{ env.ENABLE_DROIDSPACES }}" = "true" ]; then
-            CACHE_VARIANT="${CACHE_VARIANT}-ds"
-          fi
           echo "CACHE_VARIANT=$CACHE_VARIANT" >> $GITHUB_ENV
           echo "当前构建内核：${{ env.KERNEL_VERSION }}，缓存变体：${CACHE_VARIANT:-(无)}"
           echo "当前磁盘空间："
@@ -401,32 +369,6 @@ jobs:
             echo "未命中仓库缓存，也未找到公共缓存，将从空缓存开始构建"
           fi
 
-      - name: 🔧 Add Re-Kernel Support (添加 Re-Kernel 支持)
-        if: ${{ env.ENABLE_REKERNEL == 'true' }}
-        run: |
-            cd kernel_workspace
-            VERSION=$(awk -F'=' '/^VERSION[ \t]*=/ {gsub(/ /,"",$2); print $2}' common/Makefile)
-            PATCHLEVEL=$(awk -F'=' '/^PATCHLEVEL[ \t]*=/ {gsub(/ /,"",$2); print $2}' common/Makefile)
-            echo "内核版本: ${VERSION}.${PATCHLEVEL}"
-            [ ! -d "Re-Kernel" ] && git clone --depth 1 https://github.com/Sakion-Team/Re-Kernel.git
-            RE_DIR="${GITHUB_WORKSPACE}/kernel_workspace/Re-Kernel/LKM-Source"
-            cd common
-            grep -q 'source "drivers/rekernel/Kconfig"' drivers/Kconfig || \
-              sed -i '/endmenu/i source "drivers/rekernel/Kconfig"' drivers/Kconfig
-            grep -q 'obj-$(CONFIG_REKERNEL)' drivers/Makefile || \
-              printf '\n# Re-Kernel\nobj-$(CONFIG_REKERNEL) += rekernel/\n' >> drivers/Makefile
-            mkdir -p drivers/rekernel
-            cp ${RE_DIR}/* drivers/rekernel/
-            TARGET="KERNEL_${VERSION}_${PATCHLEVEL}"
-            if grep -q "$TARGET" drivers/rekernel/rekernel.h; then
-              sed -i "s|^[[:space:]]*//[[:space:]]*#define[[:space:]]\+$TARGET|#define $TARGET|" drivers/rekernel/rekernel.h
-              echo "CONFIG_REKERNEL=m" >> arch/arm64/configs/gki_defconfig
-              echo "CONFIG_REKERNEL_NETWORK=y" >> arch/arm64/configs/gki_defconfig
-              echo "✅ Re-Kernel 配置完成"
-            else
-              echo "⚠️ 不支持的内核版本: $TARGET"
-            fi
-
       - name: 🔧 Add adios_ioscheduler (添加 adios_ioscheduler)
         working-directory: kernel_workspace/common
         run: |
@@ -501,7 +443,6 @@ jobs:
           echo "CONFIG_BBG=y" >> ./common/arch/arm64/configs/gki_defconfig
           sed -i '/^config LSM$/,/^help$/{ /^[[:space:]]*default/ { /baseband_guard/! s/lockdown/lockdown,baseband_guard/ } }' ./common/security/Kconfig
 
-      
       - name: 📥 Download official Manager APK (下载官方 CI 版 Manager APK)
         id: apk
         if: ${{ env.ENABLE_KSU_APK == 'true' }}
@@ -563,40 +504,6 @@ jobs:
           echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
           echo "ksuver=$KSU_VERSION" >> $GITHUB_OUTPUT
 
-      - name: 🔧 Apply Droidspaces SYSVIPC kABI fix (应用 Droidspaces SYSVIPC kABI 修复)
-        if: ${{ env.ENABLE_DROIDSPACES == 'true' }}
-        working-directory: kernel_workspace/common
-        run: |
-          echo "==> 开始应用 Droidspaces SYSVIPC kABI 修复补丁..."
-          KABI_PATCH="${GITHUB_WORKSPACE}/patch/GKI-6.6-sysvipc_kabi_3_4_5.patch"
-          if [ ! -f "$KABI_PATCH" ]; then
-            echo "::error::未找到 Droidspaces SYSVIPC kABI 补丁: $KABI_PATCH"
-            exit 1
-          fi
-          if ! patch -p1 --forward < "$KABI_PATCH"; then
-            echo "::warning::SYSVIPC kABI 补丁应用失败，可能已应用或上下文不匹配"
-          fi
-          echo "==> Droidspaces SYSVIPC kABI 修复完成"
-
-      - name: 🔧 Apply ntsync Patch (应用 ntsync 补丁)
-        if: ${{ env.ENABLE_DROIDSPACES == 'true' }}
-        working-directory: kernel_workspace/common
-        run: |
-          echo "==> 开始应用 ntsync 补丁..."
-          for PATCH_NAME in "ntsync_base.patch" "ntsync_compat_6.6.patch"; do
-            PATCH_PATH="${GITHUB_WORKSPACE}/patch/${PATCH_NAME}"
-            if [ ! -f "$PATCH_PATH" ]; then
-              echo "::error::未找到 ntsync 补丁: $PATCH_PATH"
-              exit 1
-            fi
-            echo "  应用: $PATCH_NAME"
-            dos2unix "$PATCH_PATH"
-            if ! git apply --ignore-whitespace "$PATCH_PATH"; then
-              echo "::warning::补丁 $PATCH_NAME 应用失败，可能已应用或上下文不匹配"
-            fi
-          done
-          echo "==> ntsync 补丁应用完成"
-
       - name: 🔧 Apply Unicode zero-width bypass fix (应用Unicode零宽绕过修复补丁)
         if: ${{ env.ENABLE_ZW_FIX == 'true' }}
         working-directory: kernel_workspace/common
@@ -638,69 +545,6 @@ jobs:
         run: |
           cd kernel_workspace
           DEFCONFIG="./common/arch/arm64/configs/gki_defconfig"
-
-          # ==================== Droidspaces 内核配置 ====================
-          if [ "${{ env.ENABLE_DROIDSPACES }}" = "true" ]; then
-            echo "==> 开始配置 Droidspaces 内核选项..."
-
-            enable_config() {
-              local cfg="$1"
-              if grep -q "^${cfg}=y" "$DEFCONFIG"; then
-                echo "  已启用: $cfg"
-              elif grep -q "^# ${cfg} is not set" "$DEFCONFIG"; then
-                sed -i "s/^# ${cfg} is not set$/${cfg}=y/" "$DEFCONFIG"
-                echo "  已切换: $cfg"
-              else
-                echo "${cfg}=y" >> "$DEFCONFIG"
-                echo "  已添加: $cfg"
-              fi
-            }
-
-            enable_config_if_defined() {
-              local cfg="$1"
-              local name="${cfg#CONFIG_}"
-              if grep -RqsE --include='Kconfig*' "^[[:space:]]*(menuconfig|config)[[:space:]]+${name}$" .; then
-                enable_config "$cfg"
-              else
-                echo "  当前内核未定义: $cfg，跳过"
-              fi
-            }
-
-            disable_config() {
-              local cfg="$1"
-              if grep -q "^${cfg}=n" "$DEFCONFIG"; then
-                echo "  已禁用: $cfg"
-              elif grep -q "^${cfg}=y" "$DEFCONFIG"; then
-                sed -i "s/^${cfg}=y$/${cfg}=n/" "$DEFCONFIG"
-                echo "  已关闭: $cfg"
-              else
-                echo "# ${cfg} is not set" >> "$DEFCONFIG"
-                echo "  已添加并禁用: $cfg"
-              fi
-            }
-
-            # ---- 必要配置 (Droidspaces 容器必须) ----
-            enable_config CONFIG_SYSVIPC
-            enable_config CONFIG_POSIX_MQUEUE
-            enable_config CONFIG_IPC_NS
-            enable_config CONFIG_PID_NS
-            enable_config CONFIG_DEVTMPFS
-
-            # ---- 网络相关配置 (Docker/NAT 模式, 按 Kconfig 实际存在启用) ----
-            enable_config_if_defined CONFIG_NETFILTER_XT_MATCH_ADDRTYPE
-            enable_config_if_defined CONFIG_NETFILTER_XT_TARGET_LOG
-            enable_config_if_defined CONFIG_NETFILTER_XT_MATCH_RECENT
-            enable_config_if_defined CONFIG_IP_SET
-            enable_config_if_defined CONFIG_IP_SET_HASH_IP
-            enable_config_if_defined CONFIG_IP_SET_HASH_NET
-            enable_config_if_defined CONFIG_NETFILTER_XT_SET
-            enable_config_if_defined CONFIG_NETFILTER_XT_TARGET_REJECT
-            enable_config_if_defined CONFIG_IP_NF_TARGET_REJECT
-            disable_config CONFIG_ANDROID_PARANOID_NETWORK
-            echo "CONFIG_NTSYNC=y" >> "$DEFCONFIG"
-
-            echo "==> Droidspaces 内核配置完成"
-          fi
 
           # ==================== KSU 配置 ====================
           echo "CONFIG_KSU=y" >> "$DEFCONFIG"
@@ -975,8 +819,8 @@ jobs:
             echo
             echo "- SUSFS：${ENABLE_SUSFS}"
             echo "- Manager APK：${ENABLE_KSU_APK}${MANAGER_VER:+（${MANAGER_VER}）}"
-            echo "- ADIOS：${ENABLE_ADIOS} / Re-Kernel：${ENABLE_REKERNEL} / BBG：${ENABLE_BBG}"
-            echo "- Droidspaces：${ENABLE_DROIDSPACES} / Unicode 修复：${ENABLE_ZW_FIX} / 签名 boot：${ENABLE_SIGNED}"
+            echo "- ADIOS：${ENABLE_ADIOS} / BBG：${ENABLE_BBG}"
+            echo "- Unicode 修复：${ENABLE_ZW_FIX} / 签名 boot：${ENABLE_SIGNED}"
             echo
             echo "> 首次刷入若提示「数据可能已损坏」，通常是 f2fs 格式不兼容，需清除数据；刷回原 boot 可保留数据。"
           } > release_notes.md
@@ -987,96 +831,3 @@ jobs:
             --title "Kernel ${KERNEL_VERSION} · BakaSU ${KSUVER}" \
             --notes-file release_notes.md \
             --target "${GITHUB_SHA}"
-
-  upload_rekernel:
-    name: Upload Re-Kernel Module
-    if: ${{ github.event.inputs.enable_ReKernel == 'true' }}
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - name: 🔎 Find Re-Kernel module zip (查找Re-Kernel最新模块并下载)
-        id: download-rekernel
-        uses: actions/github-script@v8
-        env:
-          KERNEL_MAJOR: "6.6"
-        with:
-          script: |
-            const owner = 'Sakion-Team';
-            const repo = 'Re-Kernel';
-            const kernelMajor = process.env.KERNEL_MAJOR;
-
-            core.info(`正在获取 ${owner}/${repo} 的最新 release...`);
-
-            const release = await github.rest.repos.getLatestRelease({
-              owner,
-              repo,
-            });
-            core.info(`最新版本: ${release.data.tag_name}`);
-            const escapedKernel = kernelMajor.replace(/\./g, '\\.');
-            const pattern66 = new RegExp(`^Re-Kernel-v([\\d.]+)-${escapedKernel}\\.zip$`);
-            const patternAny = new RegExp(`^Re-Kernel.*\\.zip$`, 'i');
-
-            let targetAsset = null;
-            let versionNumber = '';
-            let isExactMatch = false;
-
-            for (const asset of release.data.assets || []) {
-              const match = asset.name.match(pattern66);
-              if (match) {
-                targetAsset = asset;
-                versionNumber = match[1];
-                isExactMatch = true;
-                core.info(`找到精确匹配 6.6: ${asset.name}`);
-                break;
-              }
-            }
-
-            if (!targetAsset) {
-              core.info('未找到6.6版本，查找任意Re-Kernel模块...');
-              for (const asset of release.data.assets || []) {
-                const match = asset.name.match(patternAny);
-                if (match) {
-                  targetAsset = asset;
-                  versionNumber = asset.name.replace(/Re-Kernel-v|.zip/gi, '').replace(/^-/, '').replace(/-$/, '') || 'latest';
-                  isExactMatch = false;
-                  core.info(`找到Re-Kernel模块: ${asset.name}`);
-                  break;
-                }
-              }
-            }
-
-            if (!targetAsset) {
-              core.setFailed('未找到任何 Re-Kernel 模块资产');
-              return;
-            }
-
-            core.info(`找到目标资产: ${targetAsset.name} (版本: ${versionNumber}, ${(targetAsset.size / 1024).toFixed(1)} KB)`);
-            core.setOutput('asset-name', targetAsset.name);
-            core.setOutput('download-url', targetAsset.browser_download_url);
-            core.setOutput('version-number', versionNumber);
-
-      - name: 📥 Download Re-Kernel module (下载 Re-Kernel 模块)
-        env:
-          ASSET_NAME: ${{ steps.download-rekernel.outputs.asset-name }}
-          DOWNLOAD_URL: ${{ steps.download-rekernel.outputs.download-url }}
-          VERSION_NUMBER: ${{ steps.download-rekernel.outputs.version-number }}
-        run: |
-          set -euo pipefail
-          ARTIFACT_NAME="Re-Kernel-v${VERSION_NUMBER}"
-          echo "正在下载 Re-Kernel 模块: $ASSET_NAME"
-          echo "下载地址: $DOWNLOAD_URL"
-          echo "Artifact 名称: $ARTIFACT_NAME"
-          aria2c -s16 -x16 -k1M "$DOWNLOAD_URL" -o "$ASSET_NAME"
-          echo "✓ Re-Kernel 模块下载完成"
-          ls -lh "$ASSET_NAME"
-          echo "正在创建目录 $ARTIFACT_NAME 并解压模块..."
-          mkdir -p "$ARTIFACT_NAME"
-          unzip -q "$ASSET_NAME" -d "$ARTIFACT_NAME"
-          echo "✓ 目录结构:"
-          ls -lR "$ARTIFACT_NAME"
-
-      - name: 📤 Upload Re-Kernel module (上传 Re-Kernel 模块)
-        uses: actions/upload-artifact@v5
-        with:
-          name: Re-Kernel-v${{ steps.download-rekernel.outputs.version-number }}
-          path: Re-Kernel-v${{ steps.download-rekernel.outputs.version-number }}
